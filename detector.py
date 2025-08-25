@@ -4,6 +4,8 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import os
+import math
+import time
 
 # Parámetros de visualización y ventana
 MARGIN = 10  # Margen para los textos de las cajas
@@ -12,6 +14,110 @@ FONT_SIZE = 2
 FONT_THICKNESS = 2
 TEXT_COLOR = (255, 0, 0)  # Rojo para las cajas y etiquetas
 RESOLUTION = (1280, 720)  # Resolución de la ventana (ancho, alto)
+
+# Parámetros del auto
+CAR_SIZE = 40
+CAR_SPEED = 2  # píxeles por frame
+CAR_COLOR = (0, 255, 0)  # Verde para el auto
+STOP_COLOR = (0, 0, 255)  # Rojo cuando está detenido
+
+class Car:
+    def __init__(self, canvas_width, canvas_height):
+        self.x = 50  # Posición inicial: abajo izquierda
+        self.y = canvas_height - 100
+        self.width = canvas_width
+        self.height = canvas_height
+        self.speed = CAR_SPEED
+        self.is_stopped = False
+        self.stop_time = 0
+        self.stop_duration = 3  # segundos que se detiene
+        self.follow_cursor = False  # Modo de seguimiento del cursor
+        self.target_x = self.x
+        self.target_y = self.y
+        
+    def update(self, stop_detected=False, mouse_x=None, mouse_y=None):
+        """Actualiza la posición del auto"""
+        if stop_detected and not self.is_stopped:
+            self.is_stopped = True
+            self.stop_time = time.time()
+            return
+            
+        if self.is_stopped:
+            if time.time() - self.stop_time > self.stop_duration:
+                self.is_stopped = False
+            else:
+                return  # El auto permanece detenido
+        
+        if self.follow_cursor and mouse_x is not None and mouse_y is not None:
+            # Modo seguimiento del cursor
+            self.target_x = mouse_x
+            self.target_y = mouse_y
+            
+            # Calcular dirección hacia el cursor
+            dx = self.target_x - self.x
+            dy = self.target_y - self.y
+            distance = math.sqrt(dx*dx + dy*dy)
+            
+            if distance > 5:  # Solo mover si está a más de 5 píxeles del objetivo
+                # Normalizar y aplicar velocidad
+                dx = (dx / distance) * self.speed
+                dy = (dy / distance) * self.speed
+                self.x += dx
+                self.y += dy
+        else:
+            # Modo patrón rectangular original
+            # Movimiento del auto en patrón rectangular
+            if self.x < self.target_x:  # Moviéndose hacia la derecha
+                self.x += self.speed
+                if self.x >= self.target_x:
+                    self.x = self.target_x
+                    self.target_y = 100
+            elif self.y > self.target_y:  # Moviéndose hacia arriba
+                self.y -= self.speed
+                if self.y <= self.target_y:
+                    self.y = self.target_y
+                    self.target_x = 50
+            elif self.x > self.target_x:  # Moviéndose hacia la izquierda
+                self.x -= self.speed
+                if self.x <= self.target_x:
+                    self.x = self.target_x
+                    self.target_y = self.height - 100
+            elif self.y < self.target_y:  # Moviéndose hacia abajo
+                self.y += self.speed
+                if self.y >= self.target_y:
+                    self.y = self.target_y
+                    self.target_x = self.width - 100
+    
+    def draw(self, canvas):
+        """Dibuja el auto en el canvas"""
+        color = STOP_COLOR if self.is_stopped else CAR_COLOR
+        
+        # Cuerpo del auto (rectángulo)
+        cv2.rectangle(canvas, 
+                     (int(self.x - CAR_SIZE//2), int(self.y - CAR_SIZE//4)), 
+                     (int(self.x + CAR_SIZE//2), int(self.y + CAR_SIZE//4)), 
+                     color, -1)
+        
+        # Ruedas (círculos)
+        wheel_radius = CAR_SIZE // 6
+        cv2.circle(canvas, (int(self.x - CAR_SIZE//3), int(self.y + CAR_SIZE//4)), wheel_radius, (0, 0, 0), -1)
+        cv2.circle(canvas, (int(self.x + CAR_SIZE//3), int(self.y + CAR_SIZE//4)), wheel_radius, (0, 0, 0), -1)
+        cv2.circle(canvas, (int(self.x - CAR_SIZE//3), int(self.y - CAR_SIZE//4)), wheel_radius, (0, 0, 0), -1)
+        cv2.circle(canvas, (int(self.x + CAR_SIZE//3), int(self.y - CAR_SIZE//4)), wheel_radius, (0, 0, 0), -1)
+        
+        # Faros (círculos pequeños)
+        cv2.circle(canvas, (int(self.x - CAR_SIZE//3), int(self.y)), 3, (255, 255, 255), -1)
+        cv2.circle(canvas, (int(self.x + CAR_SIZE//3), int(self.y)), 3, (255, 255, 255), -1)
+        
+        # Estado del auto
+        if self.is_stopped:
+            status_text = "AUTO DETENIDO"
+        elif self.follow_cursor:
+            status_text = "AUTO SIGUIENDO CURSOR"
+        else:
+            status_text = "AUTO EN MOVIMIENTO"
+        cv2.putText(canvas, status_text, (10, RESOLUTION[1] - 20), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv2.LINE_AA)
 
 
 def center_on_canvas(image, resolution):
@@ -38,6 +144,7 @@ def draw_detections(image, detection_result):
     """
     Dibuja las cajas y etiquetas de las detecciones sobre la imagen.
     """
+    stop_detected = False
     for detection in detection_result.detections:
         bbox = detection.bounding_box
         start_point = bbox.origin_x, bbox.origin_y
@@ -49,7 +156,17 @@ def draw_detections(image, detection_result):
         result_text = f'{category_name} ({probability})'
         text_location = (MARGIN + bbox.origin_x, MARGIN + ROW_SIZE + bbox.origin_y)
         cv2.putText(image, result_text, text_location, cv2.FONT_HERSHEY_PLAIN, FONT_SIZE, TEXT_COLOR, FONT_THICKNESS)
-    return image
+        
+        # Verificar si se detectó una señal de stop
+        if category_name.lower() in ['stop sign', 'stop', 'señal de stop']:
+            stop_detected = True
+            # Resaltar la señal de stop con un color especial
+            cv2.rectangle(image, start_point, end_point, (0, 0, 255), 5)
+            cv2.putText(image, "STOP SIGN", 
+                       (bbox.origin_x, bbox.origin_y - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3, cv2.LINE_AA)
+    
+    return image, stop_detected
 
 
 def draw_help_text(canvas, help_text):
@@ -67,6 +184,18 @@ def draw_help_text(canvas, help_text):
 base_options = python.BaseOptions(model_asset_path='./model/efficientdet.tflite')
 options = vision.ObjectDetectorOptions(base_options=base_options, score_threshold=0.5)
 detector = vision.ObjectDetector.create_from_options(options)
+
+# Variables globales para el mouse
+mouse_x = None
+mouse_y = None
+
+def mouse_callback(event, x, y, flags, param):
+    """Callback para capturar la posición del mouse"""
+    global mouse_x, mouse_y
+    mouse_x, mouse_y = x, y
+
+# Inicialización del auto
+car = Car(RESOLUTION[0], RESOLUTION[1])
 
 # Carga de imágenes desde la carpeta ./img/
 img_dir = './img/'
@@ -96,11 +225,17 @@ while True:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
         detection_result = detector.detect(mp_image)
         image_copy = np.copy(frame)
-        annotated_image = draw_detections(image_copy, detection_result)
+        annotated_image, stop_detected = draw_detections(image_copy, detection_result)
         canvas = center_on_canvas(annotated_image, RESOLUTION)
-        help_text = "Modo: Camara\n[c] Cambiar a imagenes\n[q] Salir"
+        
+        # Actualizar y dibujar el auto
+        car.update(stop_detected, mouse_x, mouse_y)
+        car.draw(canvas)
+        
+        help_text = "Modo: Camara\n[c] Cambiar a imagenes\n[f] Seguir cursor\n[q] Salir"
         canvas = draw_help_text(canvas, help_text)
         cv2.imshow('Object Detection (Camera)', canvas)
+        cv2.setMouseCallback('Object Detection (Camera)', mouse_callback)
         key = cv2.waitKey(1) & 0xFF
     elif mode == 'images' and num_imgs > 0:
         # Modo visualización de imágenes
@@ -114,12 +249,18 @@ while True:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
         detection_result = detector.detect(mp_image)
         image_copy = np.copy(frame)
-        annotated_image = draw_detections(image_copy, detection_result)
+        annotated_image, stop_detected = draw_detections(image_copy, detection_result)
         canvas = center_on_canvas(annotated_image, RESOLUTION)
-        help_text = f"Modo: Imagenes ({img_idx+1}/{num_imgs})\n[c] Siguiente imagen\n[v] Volver a camara\n[q] Salir"
+        
+        # Actualizar y dibujar el auto
+        car.update(stop_detected, mouse_x, mouse_y)
+        car.draw(canvas)
+        
+        help_text = f"Modo: Imagenes ({img_idx+1}/{num_imgs})\n[c] Siguiente imagen\n[v] Volver a camara\n[f] Seguir cursor\n[q] Salir"
         canvas = draw_help_text(canvas, help_text)
         cv2.imshow('Object Detection (Images)', canvas)
-        key = cv2.waitKey(0) & 0xFF
+        cv2.setMouseCallback('Object Detection (Images)', mouse_callback)
+        key = cv2.waitKey(50) & 0xFF  # Cambiado de 0 a 50ms para permitir movimiento continuo
     else:
         # no hay imagenes, entonces lo mando a modo camara
         mode = 'camera'
@@ -139,6 +280,13 @@ while True:
         if mode == 'images':
             mode = 'camera'
             cv2.destroyAllWindows()
+    elif key == ord('f'):
+        # Cambiar modo de seguimiento del cursor
+        car.follow_cursor = not car.follow_cursor
+        if car.follow_cursor:
+            print("🚗 Modo seguimiento del cursor ACTIVADO")
+        else:
+            print("🚗 Modo patrón rectangular ACTIVADO")
 
 # Liberar recursos
 if cap is not None:
