@@ -1,25 +1,37 @@
+import cv2
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+from recognizer import create_gesture_recognizer
 
-IMAGE_FILENAMES = ['thumbs_down.jpg', 'victory.jpg',
-                   'thumbs_up.jpg', 'pointing_up.jpg']
+if __name__ == '__main__':
+    recognizer = create_gesture_recognizer()
 
-# STEP 1: Create an GestureRecognizer object.
-base_options = python.BaseOptions(
-    model_asset_path='model/gesture_recognizer.task.tflite'
-)
-options = vision.GestureRecognizerOptions(base_options=base_options)
-recognizer = vision.GestureRecognizer.create_from_options(options)
+    cap = cv2.VideoCapture(0)  # 0 is the default webcam
 
-for image_file_name in IMAGE_FILENAMES:
-    # STEP 2: Load the input image.
-    image = mp.Image.create_from_file(f"test/{image_file_name}")
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-    # STEP 3: Recognize gestures in the input image.
-    recognition_result = recognizer.recognize(image)
+        # Convertir BGR > RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    # STEP 4: Process the result. In this case, print it.
-    top_gesture = recognition_result.gestures[0][0]
+        # Crear objeto MediaPipe Image
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
 
-    print(f"Input image: {image_file_name} Top gesture: {top_gesture.category_name} ({top_gesture.score})")
+        # Realizar la detección de gestos
+        recognition_result = recognizer.recognize(mp_image)
+
+        top_gesture = recognition_result.gestures[0][0] if recognition_result.gestures else None
+
+        if top_gesture:
+            print(f"Top gesture: {top_gesture.category_name} ({top_gesture.score})")
+
+        cv2.imshow('Webcam', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to quit
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
