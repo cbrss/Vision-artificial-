@@ -1,14 +1,16 @@
+import time
+
 import cv2
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
-from recognizer import create_gesture_recognizer
+import recognizer
 import windows as win
 
-if __name__ == '__main__':
-    recognizer = create_gesture_recognizer()
+TIME_BETWEEN_GESTURES = 1
 
+if __name__ == '__main__':
+    recognizer = recognizer.create_gesture_recognizer()
     cap = cv2.VideoCapture(0)  # 0 is the default webcam
+    timer = time.time()
 
     while True:
         ret, frame = cap.read()
@@ -26,19 +28,19 @@ if __name__ == '__main__':
 
         top_gesture = recognition_result.gestures[0][0] if recognition_result.gestures else None
 
-        if top_gesture:
-            if(top_gesture.category_name == 'Open_Palm'):
+        if top_gesture and time.time() - timer > TIME_BETWEEN_GESTURES:
+            print(f"Top gesture: {top_gesture.category_name} ({top_gesture.score})")
+            if (top_gesture.category_name == 'Open_Palm'):
                 win.maximizeWindow()
-            elif(top_gesture.category_name == 'Closed_Fist'):
+            elif (top_gesture.category_name == 'Closed_Fist'):
                 win.minimizeWindow()
-            elif(top_gesture.category_name == 'Victory'):
+            elif (top_gesture.category_name == 'Victory'):
                 win.screenshotFull()
-            elif(top_gesture.category_name == 'Pointing_Up'):
+            elif (top_gesture.category_name == 'Pointing_Up'):
                 win.taskView()
-            elif(top_gesture.category_name == 'ILoveYou'):
+            elif (top_gesture.category_name == 'ILoveYou'):
                 win.nextTask()
-            #print(f"Top gesture: {top_gesture.category_name} ({top_gesture.score})")
-
+            timer = time.time()
 
         cv2.imshow('Webcam', frame)
 

@@ -1,11 +1,11 @@
 import mediapipe as mp
-from recognizer import create_gesture_recognizer
+import recognizer
 
 IMAGE_FILENAMES = ['thumbs_down.jpg', 'victory.jpg',
                    'thumbs_up.jpg', 'pointing_up.jpg']
 
 # STEP 1: Create an GestureRecognizer object.
-recognizer = create_gesture_recognizer()
+recognizer = recognizer.create_gesture_recognizer()
 
 for image_file_name in IMAGE_FILENAMES:
     # STEP 2: Load the input image.
