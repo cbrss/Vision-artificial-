@@ -3,7 +3,7 @@ import time
 
 def runShortcut(*keys):
     pyautogui.hotkey(*keys)
-    time.sleep(0.1) 
+    time.sleep(0.2) 
 
 #screenshots -> Win + PrtSc
 def screenshotFull():
@@ -27,3 +27,6 @@ def switchDesktopLeft():
 #ver todas las ventanas abiertas -> Win + Tab
 def taskView():
     runShortcut('win', 'tab')
+
+def nextTask():
+    runShortcut('alt', 'tab')

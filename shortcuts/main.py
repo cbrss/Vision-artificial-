@@ -3,6 +3,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from recognizer import create_gesture_recognizer
+import windows as win
 
 if __name__ == '__main__':
     recognizer = create_gesture_recognizer()
@@ -26,7 +27,18 @@ if __name__ == '__main__':
         top_gesture = recognition_result.gestures[0][0] if recognition_result.gestures else None
 
         if top_gesture:
-            print(f"Top gesture: {top_gesture.category_name} ({top_gesture.score})")
+            if(top_gesture.category_name == 'Open_Palm'):
+                win.maximizeWindow()
+            elif(top_gesture.category_name == 'Closed_Fist'):
+                win.minimizeWindow()
+            elif(top_gesture.category_name == 'Victory'):
+                win.screenshotFull()
+            elif(top_gesture.category_name == 'Pointing_Up'):
+                win.taskView()
+            elif(top_gesture.category_name == 'ILoveYou'):
+                win.nextTask()
+            #print(f"Top gesture: {top_gesture.category_name} ({top_gesture.score})")
+
 
         cv2.imshow('Webcam', frame)
 
