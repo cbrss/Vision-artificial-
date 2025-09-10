@@ -28,6 +28,12 @@ if __name__ == '__main__':
 
         top_gesture = recognition_result.gestures[0][0] if recognition_result.gestures else None
 
+        gesture_text = ""
+        if top_gesture:
+            gesture_text = f"{top_gesture.category_name} ({top_gesture.score:.2f})"
+            cv2.putText(frame, gesture_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                1, (0, 255, 0), 2, cv2.LINE_AA)
+    
         if top_gesture and time.time() - timer > TIME_BETWEEN_GESTURES:
             print(f"Top gesture: {top_gesture.category_name} ({top_gesture.score})")
             if (top_gesture.category_name == 'Open_Palm'):
