@@ -42,7 +42,7 @@ class camera():
 def on_mouse_click(event, x, y, flags, param):
     global points
     if event == cv.EVENT_LBUTTONDOWN:
-        if len(points) < 4:  # máximo 4 puntos
+        if len(points) < 4:  
             points.append((x, y))
             print(f"Punto agregado: {(x, y)}")
         else:
@@ -61,18 +61,12 @@ def loop():
     cv.setMouseCallback("Camera Frame", on_mouse_click)
     global points
     while True:
-        # Capture frame-by-frame
         ret, frame = cap.read()
-    
-        # if frame is read correctly ret is True
+   
         if not ret:
-            print("Can't receive frame (stream end?). Exiting ...")
+            print("Exit")
             break
-        # Our operations on the frame come here
-        #gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-        # Display the resulting frame
-        #cv.imshow('frame', gray)
-        #cv.imshow('frame',RGB)
+
 
         cv.imshow("Frame",frame)
 
@@ -102,9 +96,15 @@ def loop():
             points = []
             
         
-    # When everything done, release the capture
     cap.release()
     cv.destroyAllWindows()
 
 if __name__ == '__main__':
     loop()
+
+
+#Instrucciones:
+#Se sale con Q
+#Por defecto no detecta nada
+#Con h es modo asistido, donde te trackea en la ventana Camera Frame, 4 keypoints para hacer la homografia. Con r los borras
+#Con c es modo QR, si mostras un QR, deberia hacer la homografia solito
